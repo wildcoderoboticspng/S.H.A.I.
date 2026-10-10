@@ -1,0 +1,307 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#020817">
+<title>S.H.A.I | Smart Helpful AI Assistant</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #020817;
+  color: #a9d8ff;
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 760px;
+  margin: auto;
+  padding: 12px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 40%,
+    #06265b 0%, #030d20 60%, #020817 100%);
+}
+
+.artwork {
+  width: 100%;
+  display: block;
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: orbGlow 4s ease-in-out infinite;
+}
+
+@keyframes orbGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px #006aff22);
+  }
+  50% {
+    filter: drop-shadow(0 0 17px #007bff66);
+  }
+}
+
+.controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 0;
+}
+
+.status {
+  min-height: 18px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #83caff;
+}
+
+.mic {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 2px solid #23cfff;
+  color: white;
+  background: radial-gradient(circle, #087dff, #031638);
+  box-shadow: 0 0 22px #007bff99,
+              inset 0 0 16px #00bfff55;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mic:active { transform: scale(.94); }
+
+.mic svg {
+  width: 29px;
+  height: 29px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app.active .mic {
+  animation: micPulse .8s infinite alternate;
+}
+
+@keyframes micPulse {
+  to {
+    box-shadow: 0 0 40px #00d9ff,
+                0 0 65px #006aff88;
+  }
+}
+
+.answer {
+  display: none;
+  width: 100%;
+  max-width: 560px;
+  padding: 14px;
+  color: #c5e5ff;
+  background: #06152b;
+  border: 1px solid #14538a;
+  border-radius: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.answer.visible { display: block; }
+
+.caption {
+  color: #658fbd;
+  text-align: center;
+  font-size: 12px;
+}
+
+@media (min-width: 600px) {
+  .app { padding: 20px 30px 28px; }
+  .artwork { max-height: 78vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artwork, .mic { animation: none !important; }
+}
+</style>
+</head>
+
+<body>
+<main class="app" id="app">
+
+  <!-- Keep shai-orb.jpg beside this HTML file.
+       Use your exact original reference image. -->
+  <img
+    class="artwork"
+    src="/shai-orb.jpg"
+    alt="S.H.A.I electric-blue orbital AI sphere"
+  >
+
+  <section class="controls">
+    <div class="status" id="status" aria-live="polite">
+      S.H.A.I IS READY
+    </div>
+
+    <button class="mic" id="mic" type="button"
+      aria-label="Speak to S.H.A.I">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="9" y="2" width="6" height="13" rx="3"/>
+        <path d="M5 11a7 7 0 0 0 14 0"/>
+        <path d="M12 18v4M9 22h6"/>
+      </svg>
+    </button>
+
+    <div class="caption">
+      TAP THE MICROPHONE TO TALK
+    </div>
+
+    <div class="answer" id="answer" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+const app = document.getElementById("app");
+const mic = document.getElementById("mic");
+const statusText = document.getElementById("status");
+const answerBox = document.getElementById("answer");
+
+const SpeechRecognition =
+  window.SpeechRecognition ||
+  window.webkitSpeechRecognition;
+
+let recognition;
+let busy = false;
+
+function setStatus(text, active = false) {
+  statusText.textContent = text;
+  app.classList.toggle("active", active);
+}
+
+function speak(text) {
+  return new Promise(resolve => {
+    if (!("speechSynthesis" in window)) {
+      resolve();
+      return;
+    }
+
+    speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-ZA";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    utterance.onstart = () =>
+      setStatus("S.H.A.I IS SPEAKING", true);
+
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+
+    speechSynthesis.speak(utterance);
+  });
+}
+
+async function askAI(question) {
+  busy = true;
+  answerBox.classList.add("visible");
+  answerBox.textContent = "";
+
+  setStatus("S.H.A.I IS THINKING", true);
+
+  try {
+    const response = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "AI request failed");
+    }
+
+    answerBox.textContent = data.answer;
+    await speak(data.answer);
+
+    setStatus("S.H.A.I IS READY");
+  } catch (error) {
+    answerBox.textContent =
+      "I couldn't connect to my AI brain. Please try again.";
+    setStatus("CONNECTION ERROR");
+    console.error(error);
+  } finally {
+    busy = false;
+    app.classList.remove("active");
+  }
+}
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-ZA";
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    setStatus("LISTENING TO YOUR VOICE", true);
+  };
+
+  recognition.onresult = async event => {
+    const question = event.results[0][0].transcript.trim();
+
+    if (question) {
+      answerBox.classList.add("visible");
+      answerBox.textContent = "You: " + question;
+      await askAI(question);
+    }
+  };
+
+  recognition.onerror = event => {
+    setStatus(
+      event.error === "not-allowed"
+        ? "PLEASE ALLOW MICROPHONE ACCESS"
+        : "VOICE ERROR — PLEASE TRY AGAIN"
+    );
+  };
+
+  recognition.onend = () => {
+    if (!busy) app.classList.remove("active");
+  };
+
+  mic.addEventListener("click", () => {
+    if (busy) return;
+
+    if (speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+    }
+
+    try {
+      recognition.start();
+    } catch (error) {
+      setStatus("PLEASE WAIT, THEN TRY AGAIN");
+    }
+  });
+} else {
+  mic.addEventListener("click", () => {
+    setStatus("USE A BROWSER THAT SUPPORTS VOICE INPUT");
+  });
+}
+</script>
+</body>
+  </html>
