@@ -157,3 +157,14 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`S.H.A.I running at http://localhost:${PORT}`);
 });
+const orb = document.getElementById("shai-orb");
+
+// When S.H.A.I. starts listening:
+orb.classList.add("listening");
+
+// When listening ends and the AI starts answering:
+orb.classList.remove("listening");
+orb.classList.add("speaking");
+
+// When the spoken answer finishes:
+orb.classList.remove("speaking");
